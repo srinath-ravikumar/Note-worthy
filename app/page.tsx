@@ -19,7 +19,7 @@ export default function LandingPage() {
       {/* Hero */}
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-4 py-1.5 rounded-full border border-blue-200">
-          CS568 Research Study · UIUC 2025
+          CS568 Research Study · UIUC 2026
         </div>
         <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
           Note-Worthy

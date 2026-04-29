@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main>{children}</main>
         <footer className="text-center py-6 text-xs text-slate-400 border-t border-slate-100 mt-12">
-          CS568 User-Centered Machine Learning · University of Illinois Urbana-Champaign · 2025
+          CS568 User-Centered Machine Learning · University of Illinois Urbana-Champaign · 2026
         </footer>
       </body>
     </html>

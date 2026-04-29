@@ -23,14 +23,14 @@ const EMPTY_PRE: PreSurveyAnswers = {
 
 export default function OriginalReportPage() {
   const router = useRouter()
-  const { state, update } = useSurveyStore()
+  const { state, update, loaded } = useSurveyStore()
   const [phase, setPhase] = useState<'read' | 'survey'>('read')
   const [answers, setAnswers] = useState<PreSurveyAnswers>(EMPTY_PRE)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!state.metadata) router.replace('/survey/metadata')
-  }, [state.metadata, router])
+    if (loaded && !state.metadata) router.replace('/survey/metadata')
+  }, [loaded, state.metadata, router])
 
   function setField<K extends keyof PreSurveyAnswers>(key: K, value: PreSurveyAnswers[K]) {
     setAnswers(prev => ({ ...prev, [key]: value }))
