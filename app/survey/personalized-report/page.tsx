@@ -21,15 +21,15 @@ const EMPTY_POST: PostSurveyAnswers = {
 
 export default function PersonalizedReportPage() {
   const router = useRouter()
-  const { state, update } = useSurveyStore()
+  const { state, update, loaded } = useSurveyStore()
   const [phase, setPhase] = useState<'read' | 'survey'>('read')
   const [answers, setAnswers] = useState<PostSurveyAnswers>(EMPTY_POST)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!state.llmRewrite) router.replace('/survey/original-report')
-  }, [state.llmRewrite, router])
+    if (loaded && !state.llmRewrite) router.replace('/survey/original-report')
+  }, [loaded, state.llmRewrite, router])
 
   function setField<K extends keyof PostSurveyAnswers>(key: K, value: PostSurveyAnswers[K]) {
     setAnswers(prev => ({ ...prev, [key]: value }))

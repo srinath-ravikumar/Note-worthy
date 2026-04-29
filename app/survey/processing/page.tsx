@@ -15,13 +15,14 @@ const STEPS_UI = [
 
 export default function ProcessingPage() {
   const router = useRouter()
-  const { state, update } = useSurveyStore()
+  const { state, update, loaded } = useSurveyStore()
   const [stepIdx, setStepIdx] = useState(0)
   const [failed, setFailed] = useState(false)
   const [errMsg, setErrMsg] = useState('')
   const called = useRef(false)
 
   useEffect(() => {
+    if (!loaded) return
     if (!state.metadata || !state.preSurvey) {
       router.replace('/survey/metadata')
       return
@@ -68,7 +69,7 @@ export default function ProcessingPage() {
 
     callLLM()
     return () => clearInterval(interval)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (failed) {
     return (
