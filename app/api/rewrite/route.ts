@@ -1,9 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextResponse } from 'next/server'
 import { buildPersonalizationPrompt } from '@/lib/prompt'
 import type { UserMetadata, PreSurveyAnswers, DynamicMCQ } from '@/lib/types'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 interface LLMResponse {
   rewrite: string
@@ -11,7 +11,6 @@ interface LLMResponse {
 }
 
 function parseResponse(text: string): LLMResponse {
-  // Strip markdown code fences if Claude wraps in ```json ... ```
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
   const parsed = JSON.parse(cleaned) as LLMResponse
   if (typeof parsed.rewrite !== 'string' || !Array.isArray(parsed.questions)) {
@@ -31,16 +30,9 @@ export async function POST(req: Request) {
 
     const prompt = buildPersonalizationPrompt(metadata, preSurvey)
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 6000,
-      messages: [{ role: 'user', content: prompt }],
-    })
-
-    const rawText = message.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const result = await model.generateContent(prompt)
+    const rawText = result.response.text()
 
     const { rewrite, questions } = parseResponse(rawText)
 
