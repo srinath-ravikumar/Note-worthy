@@ -83,14 +83,15 @@ ${understandingContext(preSurvey)}
 **Structure:** ${structureInstruction(preSurvey.preferredStructure)}
 
 **Required sections (use these plain-language headers):**
-1. "What This Report Is About" — 2–3 sentence plain-language summary of why the test was done and the overall picture
-2. "Key Measurements" — explain each quantitative measurement in plain language with context (what is normal, what this patient's value means)
-3. "What We Found" — cover all 6 findings, adjusted for the reader's background; give special attention to findings they rated poorly
-4. "What This Means for the Patient" — explain the combined significance in plain terms, including what risks exist
-5. "What Should Happen Next" — restate each recommendation as a clear, numbered action item
-6. "Warning Signs" — when to seek urgent/emergency care
+1. "What This Report Is About" — 2–3 sentences only. Why the test was done and the one-line overall conclusion.
+2. "Key Measurements" — one bullet per measurement. Format: **Name (value)** — one sentence on what it means and whether it is normal. No lengthy explanations.
+3. "What We Found" — one short paragraph (3–5 sentences max) per finding. Name the finding, state whether it is mild/moderate/severe, and give one plain-language explanation of what it means for the patient. Do not repeat measurement values already listed above.
+4. "What This Means for You" — 3–5 bullet points summarising the combined picture. Be direct.
+5. "What Should Happen Next" — numbered list, one sentence per action item. No sub-bullets or lengthy explanations.
+6. "Warning Signs" — a single short bulleted list of symptoms to watch for. No sub-sections.
 
 **Critical constraints:**
+- Keep the entire rewrite under 600 words.
 - Do not omit any finding or recommendation from the original report.
 - Do not add information not present in the original.
 - Do not minimize serious findings — be clear but not unnecessarily alarming.
