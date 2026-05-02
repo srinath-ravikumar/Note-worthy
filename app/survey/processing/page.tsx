@@ -6,12 +6,20 @@ import { useSurveyStore } from '@/lib/store'
 
 const STEPS_UI = [
   'Analyzing your background and preferences...',
-  'Reviewing your comprehension responses...',
-  'Identifying terminology to simplify...',
-  'Rewriting the report for your reading level and structure preference...',
+  'Generating a plain-language version for everyone...',
+  'Personalizing the report for your reading level...',
   'Generating comprehension questions...',
-  'Finalizing your personalized version...',
+  'Finalizing your reports...',
 ]
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 export default function ProcessingPage() {
   const router = useRouter()
@@ -23,7 +31,7 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     if (!loaded) return
-    if (!state.metadata || !state.preSurvey) {
+    if (!state.metadata) {
       router.replace('/survey/metadata')
       return
     }
@@ -34,15 +42,12 @@ export default function ProcessingPage() {
       setStepIdx(i => Math.min(i + 1, STEPS_UI.length - 1))
     }, 2200)
 
-    async function callLLM() {
+    async function generate() {
       try {
         const res = await fetch('/api/rewrite', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            metadata: state.metadata,
-            preSurvey: state.preSurvey,
-          }),
+          body: JSON.stringify({ metadata: state.metadata }),
         })
 
         if (!res.ok) {
@@ -50,15 +55,28 @@ export default function ProcessingPage() {
           throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`)
         }
 
-        const data = await res.json() as { rewrite: string; questions: unknown[]; prompt: string }
+        const data = await res.json() as {
+          personalizedRewrite: string
+          genericRewrite: string
+          dynamicMCQs: import('@/lib/types').DynamicMCQ[]
+          prompt: string
+        }
+
+        const versionOrder = shuffle(['original', 'generic', 'personalized'])
+
         update({
-          llmRewrite: data.rewrite,
+          personalizedRewrite: data.personalizedRewrite,
+          genericRewrite: data.genericRewrite,
           llmPrompt: data.prompt,
-          dynamicMCQs: data.questions as import('@/lib/types').DynamicMCQ[],
-          currentStep: 4,
+          dynamicMCQs: data.dynamicMCQs,
+          versionOrder,
+          currentVersionIndex: 0,
+          versionRatings: {},
+          currentStep: 2,
         })
+
         clearInterval(interval)
-        router.push('/survey/personalized-report')
+        router.push('/survey/reading')
       } catch (err) {
         console.error(err)
         clearInterval(interval)
@@ -67,7 +85,7 @@ export default function ProcessingPage() {
       }
     }
 
-    callLLM()
+    generate()
     return () => clearInterval(interval)
   }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -76,7 +94,7 @@ export default function ProcessingPage() {
       <div className="max-w-md mx-auto px-4 py-24 text-center space-y-6">
         <div className="text-5xl">⚠️</div>
         <h2 className="text-xl font-bold text-slate-900">Something went wrong</h2>
-        <p className="text-slate-500">We couldn&apos;t generate your personalized report. This may be a temporary issue.</p>
+        <p className="text-slate-500">We couldn&apos;t generate your reports. This may be a temporary issue.</p>
         {errMsg && <p className="text-xs text-red-400 font-mono bg-red-50 rounded px-3 py-2">{errMsg}</p>}
         <button
           onClick={() => { called.current = false; setFailed(false); setErrMsg(''); setStepIdx(0) }}
@@ -84,7 +102,7 @@ export default function ProcessingPage() {
         >
           Try Again
         </button>
-        <button onClick={() => router.push('/survey/original-report')} className="btn-secondary block mx-auto mt-2">
+        <button onClick={() => router.push('/survey/metadata')} className="btn-secondary block mx-auto mt-2">
           ← Go Back
         </button>
       </div>
@@ -98,7 +116,7 @@ export default function ProcessingPage() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="text-xl font-bold text-slate-900">Personalizing Your Report</h2>
+        <h2 className="text-xl font-bold text-slate-900">Generating Your Reports</h2>
         <p className="text-slate-500 text-sm">Please don&apos;t close this tab. This takes about 20–40 seconds.</p>
       </div>
 

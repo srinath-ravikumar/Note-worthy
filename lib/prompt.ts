@@ -1,124 +1,121 @@
-import type { UserMetadata, PreSurveyAnswers } from './types'
-import { FINDING_LABELS } from '@/data/questions'
+import type { UserMetadata } from './types'
 import { MEDICAL_REPORT_TEXT } from '@/data/medical-report'
 
-function jargonInstruction(familiarity: number, background: string, role: string): string {
-  if (background === 'yes' && role) {
-    return `The reader is a healthcare professional (${role}). You may use standard medical terminology but still explain clinical implications in plain language — they may be familiar with terms but not necessarily with cardiology sub-specialties.`
+function termScore(termFamiliarity: Record<string, boolean>): number {
+  return Object.values(termFamiliarity).filter(Boolean).length
+}
+
+function jargonInstruction(metadata: UserMetadata): string {
+  if (metadata.medicalBackground === 'working') {
+    return 'The reader works in healthcare. You may use standard medical terminology but explain clinical implications clearly.'
   }
-  if (familiarity <= 1) return 'Replace ALL medical jargon with everyday words. When a medical term is unavoidable, define it immediately in plain language in parentheses. Aim for a 6th-grade reading level.'
-  if (familiarity === 2) return 'Use mostly plain language. Briefly define any medical term you use. Keep sentences short.'
-  if (familiarity === 3) return 'Balance plain language with some medical vocabulary. Always explain what technical findings mean for the patient\'s health in practical terms.'
-  if (familiarity === 4) return 'You may use standard medical terminology, but always follow each finding with a plain-language interpretation of its significance.'
-  return 'You may use precise medical terminology. Focus on clinical completeness and actionable interpretation rather than simplification.'
+  if (metadata.medicalBackground === 'some-coursework') {
+    return 'The reader has some medical coursework. Use moderate medical vocabulary with brief plain-language explanations for specialized terms.'
+  }
+  const score = termScore(metadata.termFamiliarity)
+  if (score <= 2) return 'Replace ALL medical jargon with everyday words. When a term is unavoidable, define it immediately in parentheses. Aim for a 6th-grade reading level.'
+  if (score <= 4) return 'Use mostly plain language. Briefly define any medical term you use. Keep sentences short.'
+  if (score <= 6) return 'Balance plain language with some medical vocabulary. Always explain what each finding means for the patient\'s day-to-day life.'
+  return 'You may use standard medical terminology. Focus on clinical completeness and actionable interpretation.'
 }
 
 function structureInstruction(structure: string): string {
   switch (structure) {
     case 'bullets':
-      return 'Use bullet points throughout. Organize each section with a plain-language header followed by concise bullet points. Avoid long paragraphs.'
+      return 'Use bullet points throughout. Concise bullets under plain-language headers. Avoid long paragraphs.'
     case 'paragraphs':
-      return 'Write in short, readable paragraphs. Each paragraph should cover one idea. Use plain-language section headers.'
+      return 'Write in short, readable paragraphs. One idea per paragraph. Use plain-language section headers.'
     case 'mixed':
     default:
       return 'Use a mixed format: plain-language section headers, 1–2 short sentences of context, then bullet points for key facts and action items.'
   }
 }
 
-function understandingContext(preSurvey: PreSurveyAnswers): string {
+function purposeInstruction(purpose: string, chronicCondition: string): string {
   const lines: string[] = []
-
-  if (preSurvey.understoodWhole === 'no') {
-    lines.push('The reader reported they could NOT understand the overall document — prioritize radical simplification.')
-  }
-
-  const lowFindings = FINDING_LABELS.filter(f => {
-    const rating = preSurvey.findingRatings[f.id]
-    return rating && rating <= 2
-  })
-  if (lowFindings.length > 0) {
-    lines.push(`The reader had particular difficulty with: ${lowFindings.map(f => f.label).join(', ')}. Pay extra attention to explaining these sections clearly.`)
-  }
-
-  if (preSurvey.recommendationRating <= 2) {
-    lines.push('The reader poorly understood the Recommendations section — make the action steps especially clear and actionable.')
-  }
-
-  if (preSurvey.quantitativeUnderstanding <= 2) {
-    lines.push('The reader found the quantitative measurements confusing — explain each number in context (what it measures, what the normal range is, and whether this patient\'s value is concerning).')
-  }
-
-  if (preSurvey.unfamiliarTerms.length > 0) {
-    lines.push(`The reader specifically flagged these terms as unfamiliar: ${preSurvey.unfamiliarTerms.join(', ')}${preSurvey.unfamiliarTermsOther ? `, ${preSurvey.unfamiliarTermsOther}` : ''}. Ensure each is either replaced or clearly defined.`)
-  }
-
-  if (preSurvey.highlightPreferences.trim()) {
-    lines.push(`The reader wants this specifically highlighted in medical documents: "${preSurvey.highlightPreferences}".`)
-  }
-
-  return lines.length > 0 ? lines.join('\n') : 'The reader had moderate overall comprehension of the original.'
+  if (purpose === 'myself') lines.push('The reader is reading this for their own health — emphasize personal implications and what actions they should take.')
+  if (purpose === 'family') lines.push('The reader is managing a family member\'s care — explain findings in a way that helps a caregiver understand and communicate with doctors.')
+  if (purpose === 'work') lines.push('The reader engages with medical documents professionally — they want clarity and completeness over heavy simplification.')
+  if (chronicCondition === 'yes') lines.push('The reader or a close family member has managed a chronic condition — they likely understand the long-term nature of health management.')
+  return lines.join(' ')
 }
 
-export function buildPersonalizationPrompt(
-  metadata: UserMetadata,
-  preSurvey: PreSurveyAnswers
-): string {
-  return `You are a medical document accessibility specialist. Rewrite the following echocardiogram report so it is significantly more understandable and useful for this specific reader. Then generate 5 comprehension questions.
+export function buildPersonalizationPrompt(metadata: UserMetadata): string {
+  const score = termScore(metadata.termFamiliarity)
+  return `You are a medical document accessibility specialist. Rewrite the following echocardiogram report so it is more understandable and useful for this specific reader. Then generate 5 comprehension questions.
 
 ## READER PROFILE
 - Age group: ${metadata.ageGroup}
-- Gender: ${metadata.gender}
 - Education: ${metadata.education}
-- Medical/healthcare background: ${metadata.medicalBackground === 'yes' ? `Yes — ${metadata.medicalRole || 'healthcare professional'}` : 'No'}
-- Self-rated medical terminology familiarity (1 = none, 5 = very familiar): ${metadata.terminologyFamiliarity}/5
-- How often they read medical documents: ${metadata.readingFrequency}
-
-## WHAT THE READER STRUGGLED WITH
-${understandingContext(preSurvey)}
+- English first language: ${metadata.englishFirstLanguage}
+- Medical background: ${metadata.medicalBackground}
+- Reading frequency: ${metadata.readingFrequency}
+- Has managed chronic condition: ${metadata.chronicCondition}
+- Medical term familiarity score: ${score}/8 (number of standard terms they recognise)
+- Reading purpose: ${metadata.readingPurpose}
 
 ## PERSONALIZATION INSTRUCTIONS
 
-**Terminology:** ${jargonInstruction(metadata.terminologyFamiliarity, metadata.medicalBackground, metadata.medicalRole)}
+**Terminology:** ${jargonInstruction(metadata)}
 
-**Structure:** ${structureInstruction(preSurvey.preferredStructure)}
+**Structure:** ${structureInstruction(metadata.preferredStructure)}
+
+**Context:** ${purposeInstruction(metadata.readingPurpose, metadata.chronicCondition)}
 
 **Required sections (use these plain-language headers):**
-1. "What This Report Is About" — 2–3 sentences only. Why the test was done and the one-line overall conclusion.
-2. "Key Measurements" — one bullet per measurement. Format: **Name (value)** — one sentence on what it means and whether it is normal. No lengthy explanations.
-3. "What We Found" — one short paragraph (3–5 sentences max) per finding. Name the finding, state whether it is mild/moderate/severe, and give one plain-language explanation of what it means for the patient. Do not repeat measurement values already listed above.
-4. "What This Means for You" — 3–5 bullet points summarising the combined picture. Be direct.
-5. "What Should Happen Next" — numbered list, one sentence per action item. No sub-bullets or lengthy explanations.
-6. "Warning Signs" — a single short bulleted list of symptoms to watch for. No sub-sections.
+1. "What This Report Is About" — 2–3 sentences only.
+2. "Key Measurements" — one bullet per measurement: **Name (value)** — one sentence on what it means and whether it is normal.
+3. "What We Found" — one short paragraph (3–5 sentences) per finding. Name it, state severity, give one plain-language explanation.
+4. "What This Means for You" — 3–5 bullets summarising the combined picture.
+5. "What Should Happen Next" — numbered list, one sentence per action item.
+6. "Warning Signs" — a single short bulleted list of symptoms requiring urgent care.
 
 **Critical constraints:**
 - Keep the entire rewrite under 600 words.
-- Do not omit any finding or recommendation from the original report.
-- Do not add information not present in the original.
-- Do not minimize serious findings — be clear but not unnecessarily alarming.
+- Do not omit any finding or recommendation.
+- Do not add information not in the original.
 - Maintain medical accuracy throughout.
 
 ## ORIGINAL REPORT
 ${MEDICAL_REPORT_TEXT}
 
 ## COMPREHENSION QUESTIONS
-After the rewrite, generate exactly 5 multiple-choice questions that test factual comprehension of the REWRITTEN version. Questions should cover different aspects: findings, measurements, recommendations, and significance. Each question must have 4 options (a, b, c, d) with exactly one correct answer. Make questions answerable from the rewritten text — do not use clinical knowledge not present in the rewrite.
+After the rewrite, generate exactly 5 multiple-choice questions testing factual comprehension of the rewritten version. Each question must have 4 options (a, b, c, d) with exactly one correct answer.
 
 ## OUTPUT FORMAT
-Return your entire response as a single valid JSON object with exactly this structure. Do not include any text outside the JSON:
+Return a single valid JSON object with no text outside it:
 
 {
-  "rewrite": "<the full rewritten report as a string>",
+  "rewrite": "<full rewritten report as a markdown string>",
   "questions": [
     {
       "question": "<question text>",
       "options": [
-        {"value": "a", "label": "<option A text>"},
-        {"value": "b", "label": "<option B text>"},
-        {"value": "c", "label": "<option C text>"},
-        {"value": "d", "label": "<option D text>"}
+        {"value": "a", "label": "<option A>"},
+        {"value": "b", "label": "<option B>"},
+        {"value": "c", "label": "<option C>"},
+        {"value": "d", "label": "<option D>"}
       ],
-      "correct": "<value of the correct option, e.g. 'b'>"
+      "correct": "<correct option value>"
     }
   ]
 }`
+}
+
+export function buildGenericPrompt(): string {
+  return `Rewrite the following echocardiogram report for a general audience at an 8th grade reading level.
+
+Instructions:
+- Use plain, everyday language. Replace all medical jargon.
+- Keep it concise — under 500 words total.
+- Structure: 2-sentence summary, key measurements as short bullets, findings as brief paragraphs, next steps as a numbered list, warning signs as bullets.
+- Do NOT personalize for any specific reader — this version should work for anyone.
+- Maintain medical accuracy. Do not omit any finding or recommendation.
+
+## ORIGINAL REPORT
+${MEDICAL_REPORT_TEXT}
+
+## OUTPUT FORMAT
+Return a single valid JSON object with no text outside it:
+{"rewrite": "<full rewritten report as a markdown string>", "questions": []}`
 }

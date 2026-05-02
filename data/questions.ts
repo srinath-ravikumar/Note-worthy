@@ -1,4 +1,4 @@
-// ─── SECTION 1 — DEMOGRAPHICS ────────────────────────────────────────────────
+// ─── PART A — READER PROFILE ──────────────────────────────────────────────────
 
 export interface MetadataField {
   id: string
@@ -18,40 +18,25 @@ export const METADATA_FIELDS: MetadataField[] = [
       { value: '25-34', label: '25–34' },
       { value: '35-44', label: '35–44' },
       { value: '45-54', label: '45–54' },
-      { value: '55-64', label: '55–64' },
-      { value: '65+', label: '65 or older' },
-    ],
-    required: true,
-  },
-  {
-    id: 'gender',
-    label: 'What is your gender?',
-    type: 'radio',
-    options: [
-      { value: 'male', label: 'Male' },
-      { value: 'female', label: 'Female' },
-      { value: 'non-binary', label: 'Non-binary' },
-      { value: 'prefer-not-to-say', label: 'Prefer not to say' },
+      { value: '55+', label: '55+' },
     ],
     required: true,
   },
   {
     id: 'education',
-    label: 'What is your highest level of education completed?',
+    label: 'What is your highest level of education?',
     type: 'radio',
     options: [
-      { value: 'high-school', label: 'High school diploma / GED' },
-      { value: 'some-college', label: 'Some college (no degree)' },
-      { value: 'bachelors', label: "Bachelor's degree" },
-      { value: 'masters', label: "Master's degree" },
-      { value: 'doctoral', label: 'Doctoral degree (PhD, EdD, etc.)' },
-      { value: 'professional', label: 'Professional / Medical degree (MD, JD, PharmD, etc.)' },
+      { value: 'high-school', label: 'High school' },
+      { value: 'some-college', label: 'Some college' },
+      { value: 'bachelors', label: "Bachelor's" },
+      { value: 'masters-plus', label: "Master's or higher" },
     ],
     required: true,
   },
   {
-    id: 'medicalBackground',
-    label: 'Do you have a medical or healthcare background?',
+    id: 'englishFirstLanguage',
+    label: 'Is English your first language?',
     type: 'radio',
     options: [
       { value: 'yes', label: 'Yes' },
@@ -60,38 +45,88 @@ export const METADATA_FIELDS: MetadataField[] = [
     required: true,
   },
   {
-    id: 'readingFrequency',
-    label: 'How often do you read medical documents (lab reports, radiology reports, discharge summaries)?',
+    id: 'medicalBackground',
+    label: 'Do you have any professional medical training or experience?',
     type: 'radio',
     options: [
-      { value: 'never', label: 'Never' },
+      { value: 'none', label: 'None' },
+      { value: 'some-coursework', label: 'Some coursework' },
+      { value: 'working', label: 'Working in healthcare' },
+    ],
+    required: true,
+  },
+  {
+    id: 'readingFrequency',
+    label: 'How often do you read medical documents (lab results, discharge summaries, prescriptions)?',
+    type: 'radio',
+    options: [
       { value: 'rarely', label: 'Rarely' },
-      { value: 'sometimes', label: 'Sometimes' },
-      { value: 'often', label: 'Often' },
-      { value: 'very-often', label: 'Very often' },
+      { value: 'few-times-year', label: 'A few times a year' },
+      { value: 'monthly-plus', label: 'Monthly or more' },
+    ],
+    required: true,
+  },
+  {
+    id: 'chronicCondition',
+    label: 'Have you or a close family member managed a chronic health condition?',
+    type: 'radio',
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No' },
+    ],
+    required: true,
+  },
+  {
+    id: 'readingPurpose',
+    label: 'When you read medical documents, it\'s usually:',
+    type: 'radio',
+    options: [
+      { value: 'myself', label: 'For my own health' },
+      { value: 'family', label: 'For a family member\'s care' },
+      { value: 'work', label: 'For work or study' },
+      { value: 'dont-read', label: 'I don\'t typically read them' },
+    ],
+    required: true,
+  },
+  {
+    id: 'preferredStructure',
+    label: 'Which format do you prefer for medical information?',
+    type: 'radio',
+    options: [
+      { value: 'bullets', label: 'Bullet points — concise, scannable' },
+      { value: 'paragraphs', label: 'Short paragraphs — more explanatory' },
+      { value: 'mixed', label: 'Mixed — headers with bullets and brief explanations' },
     ],
     required: true,
   },
 ]
 
-// ─── SECTION 2 — PRE-SURVEY ───────────────────────────────────────────────────
+// ─── TERM FAMILIARITY TEST ────────────────────────────────────────────────────
+// Participants select which terms they recognise (objective score vs. self-report)
 
-// Medical terminology checkboxes (derived from the echocardiogram report)
-export const TERMINOLOGY_OPTIONS = [
-  { value: 'echocardiography', label: 'Echocardiography' },
-  { value: 'transthoracic', label: 'Transthoracic' },
-  { value: 'hypertension', label: 'Hypertension' },
-  { value: 'dyslipidemia', label: 'Dyslipidemia' },
-  { value: 'tdi', label: 'Tissue Doppler Imaging (TDI)' },
-  { value: 'exertional_dyspnea', label: 'Exertional Dyspnea' },
-  { value: 'lower_extremity_edema', label: 'Lower Extremity Edema' },
-  { value: 'lbbb', label: 'Left Bundle Branch Block (LBBB)' },
-  { value: 'non_ischemic_etiology', label: 'Non-Ischemic Etiology' },
-  { value: 'ischemic_cardiomyopathy', label: 'Ischemic Cardiomyopathy' },
-  { value: 'coronary_angiography', label: 'Coronary Angiography' },
+export const TERM_FAMILIARITY_TERMS = [
+  { id: 'hypertension', label: 'Hypertension' },
+  { id: 'bilateral-infiltrates', label: 'Bilateral infiltrates' },
+  { id: 'benign', label: 'Benign' },
+  { id: 'prognosis', label: 'Prognosis' },
+  { id: 'edema', label: 'Edema' },
+  { id: 'myocardial-infarction', label: 'Myocardial infarction' },
+  { id: 'cbc-panel', label: 'CBC panel' },
+  { id: 'contraindicated', label: 'Contraindicated' },
 ]
 
-// The 6 findings from the echocardiogram report
+// ─── PART B — PER-VERSION RATING QUESTIONS ────────────────────────────────────
+
+export const PART_B_QUESTIONS = [
+  { id: 'understood',       label: 'I understood the main findings of this document.' },
+  { id: 'languageClear',   label: 'The language used was clear to me.' },
+  { id: 'detailRight',     label: 'The level of detail felt right — not too much, not too little.' },
+  { id: 'feltPersonalized', label: 'The document felt like it was written for someone like me.' },
+  { id: 'wouldPrefer',     label: 'I would prefer to receive medical information in this format.' },
+]
+
+// ─── FINDING LABELS (used in prompt for section context) ─────────────────────
+
 export const FINDING_LABELS = [
   { id: 'f1', label: 'Finding 1: Left Ventricular Systolic Dysfunction' },
   { id: 'f2', label: 'Finding 2: Diastolic Dysfunction — Grade II' },
@@ -99,20 +134,4 @@ export const FINDING_LABELS = [
   { id: 'f4', label: 'Finding 4: Pulmonary Hypertension' },
   { id: 'f5', label: 'Finding 5: Mild Aortic Valve Sclerosis' },
   { id: 'f6', label: 'Finding 6: Pericardial Effusion' },
-]
-
-export const PREFERRED_STRUCTURE_OPTIONS = [
-  { value: 'bullets', label: 'Bullet points — concise, scannable' },
-  { value: 'paragraphs', label: 'Short paragraphs — more explanatory flow' },
-  { value: 'mixed', label: 'Mixed — headers with bullets and brief explanations' },
-]
-
-// ─── SECTION 3 — POST-SURVEY ──────────────────────────────────────────────────
-
-export const VERSION_PREFERENCE_OPTIONS = [
-  { value: 'strongly-prefer-rewrite', label: 'Strongly prefer the rewritten version' },
-  { value: 'prefer-rewrite', label: 'Prefer the rewritten version' },
-  { value: 'no-preference', label: 'No preference' },
-  { value: 'prefer-original', label: 'Prefer the original version' },
-  { value: 'strongly-prefer-original', label: 'Strongly prefer the original version' },
 ]

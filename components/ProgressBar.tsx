@@ -2,16 +2,17 @@
 
 const STEPS = [
   { label: 'About You', step: 1 },
-  { label: 'Original Report', step: 2 },
-  { label: 'Personalized Report', step: 3 },
+  { label: 'Read & Rate', step: 2 },
+  { label: 'Compare', step: 3 },
   { label: 'Complete', step: 4 },
 ]
 
 interface Props {
-  currentStep: number // 1-4
+  currentStep: number   // 1–4
+  subLabel?: string     // e.g. "Report 2 of 3"
 }
 
-export default function ProgressBar({ currentStep }: Props) {
+export default function ProgressBar({ currentStep, subLabel }: Props) {
   return (
     <div className="w-full py-4 px-6 bg-white border-b border-slate-200">
       <div className="max-w-3xl mx-auto">
@@ -30,6 +31,9 @@ export default function ProgressBar({ currentStep }: Props) {
                   </div>
                   <span className={`mt-1 text-xs font-medium hidden sm:block ${active ? 'text-blue-700' : done ? 'text-blue-600' : 'text-slate-400'}`}>
                     {s.label}
+                    {active && subLabel && (
+                      <span className="block text-blue-500 font-normal">{subLabel}</span>
+                    )}
                   </span>
                 </div>
                 {idx < STEPS.length - 1 && (

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
-import { buildPersonalizationPrompt } from '@/lib/prompt'
-import type { UserMetadata, PreSurveyAnswers, DynamicMCQ } from '@/lib/types'
+import { buildPersonalizationPrompt, buildGenericPrompt } from '@/lib/prompt'
+import type { UserMetadata, DynamicMCQ } from '@/lib/types'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -19,31 +19,42 @@ function parseResponse(text: string): LLMResponse {
   return parsed
 }
 
+async function callLLM(prompt: string): Promise<LLMResponse> {
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 6000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const rawText = message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('')
+  return parseResponse(rawText)
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as { metadata: UserMetadata; preSurvey: PreSurveyAnswers }
-    const { metadata, preSurvey } = body
+    const body = await req.json() as { metadata: UserMetadata }
+    const { metadata } = body
 
-    if (!metadata || !preSurvey) {
-      return NextResponse.json({ error: 'Missing metadata or preSurvey' }, { status: 400 })
+    if (!metadata) {
+      return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
     }
 
-    const prompt = buildPersonalizationPrompt(metadata, preSurvey)
+    const personalizedPrompt = buildPersonalizationPrompt(metadata)
+    const genericPrompt = buildGenericPrompt()
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 6000,
-      messages: [{ role: 'user', content: prompt }],
+    const [personalized, generic] = await Promise.all([
+      callLLM(personalizedPrompt),
+      callLLM(genericPrompt),
+    ])
+
+    return NextResponse.json({
+      personalizedRewrite: personalized.rewrite,
+      genericRewrite: generic.rewrite,
+      dynamicMCQs: personalized.questions,
+      prompt: personalizedPrompt,
     })
-
-    const rawText = message.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-
-    const { rewrite, questions } = parseResponse(rawText)
-
-    return NextResponse.json({ rewrite, questions, prompt })
   } catch (err) {
     console.error('[/api/rewrite]', err)
     const message = err instanceof Error ? err.message : 'Unknown error'

@@ -8,10 +8,8 @@ export default function CompletePage() {
   const { state } = useSurveyStore()
 
   useEffect(() => {
-    // Clear localStorage after successful submission so future visits start fresh
-    // Delay slightly to prevent race conditions
     const timer = setTimeout(() => {
-      localStorage.removeItem('cs568_survey_v1')
+      localStorage.removeItem('cs568_survey_v2')
     }, 2000)
     return () => clearTimeout(timer)
   }, [])
@@ -36,11 +34,11 @@ export default function CompletePage() {
         <ul className="space-y-2 text-sm text-slate-600">
           <li className="flex gap-2">
             <span className="text-blue-600">•</span>
-            Your anonymous responses will be aggregated with 300+ other participants.
+            Your anonymous responses will be aggregated with other participants.
           </li>
           <li className="flex gap-2">
             <span className="text-blue-600">•</span>
-            We&apos;ll analyze which user signals most meaningfully predict satisfaction with personalized rewrites.
+            We&apos;ll analyze which reader signals most predict satisfaction with personalized rewrites versus generic ones.
           </li>
           <li className="flex gap-2">
             <span className="text-blue-600">•</span>

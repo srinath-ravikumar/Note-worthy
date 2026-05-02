@@ -3,19 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ProgressBar from '@/components/ProgressBar'
-import LikertScale from '@/components/LikertScale'
 import { useSurveyStore } from '@/lib/store'
-import { METADATA_FIELDS } from '@/data/questions'
+import { METADATA_FIELDS, TERM_FAMILIARITY_TERMS } from '@/data/questions'
 import type { UserMetadata } from '@/lib/types'
 
 const EMPTY: UserMetadata = {
   ageGroup: '',
-  gender: '',
   education: '',
+  englishFirstLanguage: '',
   medicalBackground: '',
-  medicalRole: '',
-  terminologyFamiliarity: 0,
   readingFrequency: '',
+  chronicCondition: '',
+  termFamiliarity: {},
+  readingPurpose: '',
+  preferredStructure: '',
 }
 
 export default function MetadataPage() {
@@ -24,29 +25,35 @@ export default function MetadataPage() {
   const [answers, setAnswers] = useState<UserMetadata>(EMPTY)
   const [error, setError] = useState('')
 
-  function set<K extends keyof UserMetadata>(id: K, value: UserMetadata[K]) {
+  function setField<K extends keyof UserMetadata>(id: K, value: UserMetadata[K]) {
     setAnswers(prev => ({ ...prev, [id]: value }))
     setError('')
+  }
+
+  function toggleTerm(termId: string) {
+    setAnswers(prev => ({
+      ...prev,
+      termFamiliarity: {
+        ...prev.termFamiliarity,
+        [termId]: !prev.termFamiliarity[termId],
+      },
+    }))
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const missingFields = METADATA_FIELDS.filter(f => {
-      if (f.id === 'readingFrequency') return !answers.readingFrequency
-      return f.required && !answers[f.id as keyof UserMetadata]
+    const missing = METADATA_FIELDS.filter(f => {
+      const val = answers[f.id as keyof UserMetadata]
+      return f.required && (!val || (typeof val === 'string' && !val))
     })
-    if (missingFields.length > 0) {
-      setError('Please answer all required questions before continuing.')
-      return
-    }
-    if (!answers.terminologyFamiliarity) {
-      setError('Please rate your familiarity with medical terminology.')
+    if (missing.length > 0) {
+      setError('Please answer all questions before continuing.')
       return
     }
 
     update({ metadata: answers, currentStep: 2 })
-    router.push('/survey/original-report')
+    router.push('/survey/processing')
   }
 
   return (
@@ -62,8 +69,8 @@ export default function MetadataPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Age, Gender, Education, Medical Background */}
-          {METADATA_FIELDS.slice(0, 4).map(field => (
+          {/* Radio questions */}
+          {METADATA_FIELDS.map(field => (
             <div key={field.id} className="card p-5 space-y-3">
               <p className="font-medium text-slate-800">{field.label}</p>
               <div className="space-y-2">
@@ -80,7 +87,7 @@ export default function MetadataPage() {
                       name={field.id}
                       value={opt.value}
                       checked={answers[field.id as keyof UserMetadata] === opt.value}
-                      onChange={() => set(field.id as keyof UserMetadata, opt.value)}
+                      onChange={() => setField(field.id as keyof UserMetadata, opt.value)}
                       className="accent-blue-600"
                     />
                     <span className="text-sm">{opt.label}</span>
@@ -90,62 +97,38 @@ export default function MetadataPage() {
             </div>
           ))}
 
-          {/* Conditional: medical role */}
-          {answers.medicalBackground === 'yes' && (
-            <div className="card p-5 space-y-3 border-blue-200 bg-blue-50">
-              <label className="font-medium text-slate-800">
-                If yes, please specify your role{' '}
-                <span className="text-slate-400 font-normal">(e.g., nurse, doctor, medical student, pharmacist)</span>
-              </label>
-              <input
-                type="text"
-                value={answers.medicalRole}
-                onChange={e => set('medicalRole', e.target.value)}
-                placeholder="Your role in healthcare..."
-                className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-          )}
-
-          {/* Terminology familiarity — Likert */}
+          {/* Term familiarity test */}
           <div className="card p-5 space-y-4">
-            <LikertScale
-              id="terminologyFamiliarity"
-              question="How familiar are you with medical terminology?"
-              value={answers.terminologyFamiliarity || null}
-              lowLabel="Not at all familiar"
-              highLabel="Very familiar"
-              onChange={v => set('terminologyFamiliarity', v)}
-            />
-          </div>
-
-          {/* Reading frequency */}
-          {METADATA_FIELDS.slice(4).map(field => (
-            <div key={field.id} className="card p-5 space-y-3">
-              <p className="font-medium text-slate-800">{field.label}</p>
-              <div className="space-y-2">
-                {field.options.map(opt => (
-                  <label
-                    key={opt.value}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
-                      ${answers[field.id as keyof UserMetadata] === opt.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-900'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
-                  >
-                    <input
-                      type="radio"
-                      name={field.id}
-                      value={opt.value}
-                      checked={answers[field.id as keyof UserMetadata] === opt.value}
-                      onChange={() => set(field.id as keyof UserMetadata, opt.value)}
-                      className="accent-blue-600"
-                    />
-                    <span className="text-sm">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
+            <div>
+              <p className="font-medium text-slate-800">
+                For each term below, select <span className="text-blue-700 font-semibold">"I know this"</span> if you know what it means:
+              </p>
+              <p className="text-sm text-slate-500 mt-0.5">Leave blank if you are unsure — there are no wrong answers.</p>
             </div>
-          ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {TERM_FAMILIARITY_TERMS.map(term => {
+                const known = !!answers.termFamiliarity[term.id]
+                return (
+                  <button
+                    key={term.id}
+                    type="button"
+                    onClick={() => toggleTerm(term.id)}
+                    className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-colors
+                      ${known
+                        ? 'border-green-500 bg-green-50 text-green-900'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'}`}
+                  >
+                    <span className={`w-5 h-5 rounded flex-none flex items-center justify-center text-xs font-bold border
+                      ${known ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300'}`}>
+                      {known ? '✓' : ''}
+                    </span>
+                    <span className="text-sm">{term.label}</span>
+                    {known && <span className="ml-auto text-xs text-green-600 font-medium">I know this</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
           {error && (
             <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-4 py-3">
@@ -155,7 +138,7 @@ export default function MetadataPage() {
 
           <div className="flex justify-end">
             <button type="submit" className="btn-primary">
-              Next: Read the Report →
+              Next: Generate My Reports →
             </button>
           </div>
         </form>

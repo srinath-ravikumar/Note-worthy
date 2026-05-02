@@ -4,9 +4,13 @@ import { getAdminClient } from '@/lib/supabase'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { participantId, startedAt, metadata, preSurvey, llmPrompt, llmRewrite, dynamicMCQs, postSurvey } = body
+    const {
+      participantId, startedAt, metadata,
+      genericRewrite, personalizedRewrite, llmPrompt, dynamicMCQs,
+      versionOrder, versionRatings, finalComparison,
+    } = body
 
-    if (!participantId || !metadata || !preSurvey || !postSurvey) {
+    if (!participantId || !metadata || !versionRatings || !finalComparison) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -17,11 +21,13 @@ export async function POST(req: Request) {
         participant_id: participantId,
         started_at: startedAt,
         metadata,
-        pre_survey: preSurvey,
-        llm_prompt: llmPrompt,
-        llm_rewrite: llmRewrite,
+        generic_rewrite: genericRewrite ?? '',
+        personalized_rewrite: personalizedRewrite ?? '',
+        llm_prompt: llmPrompt ?? '',
         dynamic_mcqs: dynamicMCQs ?? [],
-        post_survey: postSurvey,
+        version_order: versionOrder ?? [],
+        version_ratings: versionRatings,
+        final_comparison: finalComparison,
         completed: true,
       },
       { onConflict: 'participant_id' }

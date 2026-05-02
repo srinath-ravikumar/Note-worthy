@@ -4,18 +4,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import type { SurveyState } from './types'
 
-const STORAGE_KEY = 'cs568_survey_v1'
+const STORAGE_KEY = 'cs568_survey_v2'
 
 const defaultState: SurveyState = {
   participantId: '',
   startedAt: '',
   currentStep: 0,
   metadata: null,
-  preSurvey: null,
-  llmRewrite: null,
+  genericRewrite: null,
+  personalizedRewrite: null,
   llmPrompt: null,
   dynamicMCQs: null,
-  postSurvey: null,
+  versionOrder: null,
+  currentVersionIndex: 0,
+  versionRatings: {},
+  finalComparison: null,
   completedAt: null,
 }
 

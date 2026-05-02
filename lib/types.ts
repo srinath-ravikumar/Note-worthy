@@ -1,22 +1,13 @@
 export interface UserMetadata {
   ageGroup: string
-  gender: string
   education: string
-  medicalBackground: string        // 'yes' | 'no'
-  medicalRole: string              // open text, conditional
-  terminologyFamiliarity: number   // 1–5 Likert
-  readingFrequency: string
-}
-
-export interface PreSurveyAnswers {
-  understoodWhole: string          // 'yes' | 'no'
-  unfamiliarTerms: string[]        // checked terminology values
-  unfamiliarTermsOther: string     // free text "other" field
-  quantitativeUnderstanding: number // 1–5
-  findingRatings: Record<string, number> // findingId -> 1–5
-  recommendationRating: number    // 1–5
-  preferredStructure: string      // 'bullets' | 'paragraphs' | 'mixed'
-  highlightPreferences: string    // open text, optional
+  englishFirstLanguage: string
+  medicalBackground: string        // 'none' | 'some-coursework' | 'working'
+  readingFrequency: string         // 'rarely' | 'few-times-year' | 'monthly-plus'
+  chronicCondition: string         // 'yes' | 'no'
+  termFamiliarity: Record<string, boolean>  // term id -> knows it
+  readingPurpose: string           // 'myself' | 'family' | 'work' | 'dont-read'
+  preferredStructure: string       // 'bullets' | 'paragraphs' | 'mixed'
 }
 
 export interface DynamicMCQ {
@@ -25,13 +16,18 @@ export interface DynamicMCQ {
   correct: string
 }
 
-export interface PostSurveyAnswers {
-  easeOfUnderstanding: number     // 1–5
-  detailMatch: number             // 1–5
-  structureMatch: number          // 1–5
-  versionPreference: string       // preference scale value
-  mcqAnswers: Record<string, string> // question index -> chosen option value
-  openComments: string
+export interface VersionRating {
+  understood: number        // 1–5
+  languageClear: number     // 1–5
+  detailRight: number       // 1–5
+  feltPersonalized: number  // 1–5
+  wouldPrefer: number       // 1–5
+  mcqAnswers: Record<string, string>  // only populated for personalized version
+}
+
+export interface FinalComparison {
+  ranking: string[]   // e.g. ['personalized', 'original', 'generic'] — most to least preferred
+  comments: string
 }
 
 export interface SurveyState {
@@ -39,11 +35,14 @@ export interface SurveyState {
   startedAt: string
   currentStep: number
   metadata: UserMetadata | null
-  preSurvey: PreSurveyAnswers | null
-  llmRewrite: string | null
+  genericRewrite: string | null
+  personalizedRewrite: string | null
   llmPrompt: string | null
   dynamicMCQs: DynamicMCQ[] | null
-  postSurvey: PostSurveyAnswers | null
+  versionOrder: string[] | null        // randomized ['original','generic','personalized']
+  currentVersionIndex: number          // 0, 1, or 2
+  versionRatings: Record<string, VersionRating>
+  finalComparison: FinalComparison | null
   completedAt: string | null
 }
 
@@ -52,10 +51,12 @@ export interface SurveyRecord {
   created_at?: string
   updated_at?: string
   metadata: UserMetadata
-  pre_survey: PreSurveyAnswers
+  generic_rewrite: string
+  personalized_rewrite: string
   llm_prompt: string
-  llm_rewrite: string
   dynamic_mcqs: DynamicMCQ[]
-  post_survey: PostSurveyAnswers
+  version_order: string[]
+  version_ratings: Record<string, VersionRating>
+  final_comparison: FinalComparison
   completed: boolean
 }
