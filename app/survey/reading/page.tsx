@@ -97,7 +97,7 @@ export default function ReadingPage() {
       setPhase('read')
       window.scrollTo(0, 0)
     } else {
-      update({ versionRatings: newRatings, currentStep: 3 })
+      update({ versionRatings: newRatings, currentStep: 3, currentVersionIndex: 3 })
       router.push('/survey/final')
     }
   }
