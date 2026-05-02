@@ -3,17 +3,36 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import type { UserMetadata, PreSurveyAnswers, PostSurveyAnswers, DynamicMCQ } from '@/lib/types'
+import type { UserMetadata, VersionRating, FinalComparison, DynamicMCQ } from '@/lib/types'
 
 interface AdminRecord {
   id: string
   created_at: string
   participant_id: string
   metadata: UserMetadata
-  pre_survey: PreSurveyAnswers
+  version_order: string[]
+  version_ratings: Record<string, VersionRating>
+  final_comparison: FinalComparison
   dynamic_mcqs: DynamicMCQ[]
-  post_survey: PostSurveyAnswers
   completed: boolean
+}
+
+const VERSION_LABELS: Record<string, string> = {
+  original: 'Original',
+  generic: 'Plain Language',
+  personalized: 'Personalized',
+}
+
+const RATING_KEYS: (keyof VersionRating)[] = [
+  'understood', 'languageClear', 'detailRight', 'feltPersonalized', 'wouldPrefer',
+]
+
+const RATING_SHORT: Record<string, string> = {
+  understood: 'Understood',
+  languageClear: 'Clear Language',
+  detailRight: 'Detail Right',
+  feltPersonalized: 'Felt Personal',
+  wouldPrefer: 'Would Prefer',
 }
 
 function avg(values: number[]) {
@@ -24,6 +43,10 @@ function avg(values: number[]) {
 function pct(num: number, den: number) {
   if (!den) return '—'
   return `${Math.round((num / den) * 100)}%`
+}
+
+function termScore(termFamiliarity: Record<string, boolean> = {}): number {
+  return Object.values(termFamiliarity).filter(Boolean).length
 }
 
 function mcqScore(answers: Record<string, string>, mcqs: DynamicMCQ[]): number | null {
@@ -67,30 +90,30 @@ function AdminDashboard() {
     if (!rows.length) return
     const headers = [
       'participant_id', 'created_at', 'completed',
-      'age_group', 'gender', 'education', 'medical_background', 'medical_role',
-      'terminology_familiarity', 'reading_frequency',
-      'understood_whole', 'unfamiliar_terms_count', 'quantitative_understanding',
-      'avg_finding_rating', 'recommendation_rating', 'preferred_structure',
-      'ease_of_understanding', 'detail_match', 'structure_match', 'version_preference',
-      'mcq_score_out_of_5',
+      'age_group', 'education', 'english_first_language', 'medical_background',
+      'reading_frequency', 'chronic_condition', 'term_familiarity_score', 'reading_purpose',
+      'version_order',
+      'original_understood', 'original_language_clear', 'original_detail_right', 'original_felt_personal', 'original_would_prefer',
+      'generic_understood', 'generic_language_clear', 'generic_detail_right', 'generic_felt_personal', 'generic_would_prefer',
+      'personalized_understood', 'personalized_language_clear', 'personalized_detail_right', 'personalized_felt_personal', 'personalized_would_prefer',
+      'mcq_score', 'ranking_1st', 'ranking_2nd', 'ranking_3rd', 'comments',
     ]
     const csvRows = rows.map(r => {
-      const pre = r.pre_survey
-      const post = r.post_survey
-      const findingValues = pre?.findingRatings ? Object.values(pre.findingRatings) : []
-      const avgFinding = findingValues.length
-        ? (findingValues.reduce((a, b) => a + b, 0) / findingValues.length).toFixed(2)
+      const m = r.metadata ?? {}
+      const vr = r.version_ratings ?? {}
+      const fc = r.final_comparison ?? {}
+      const score = vr['personalized']?.mcqAnswers && r.dynamic_mcqs
+        ? mcqScore(vr['personalized'].mcqAnswers, r.dynamic_mcqs)
         : ''
-      const mcqResult = post?.mcqAnswers && r.dynamic_mcqs ? mcqScore(post.mcqAnswers, r.dynamic_mcqs) : ''
       return [
         r.participant_id, r.created_at, r.completed,
-        r.metadata?.ageGroup, r.metadata?.gender, r.metadata?.education,
-        r.metadata?.medicalBackground, r.metadata?.medicalRole,
-        r.metadata?.terminologyFamiliarity, r.metadata?.readingFrequency,
-        pre?.understoodWhole, pre?.unfamiliarTerms?.length ?? '',
-        pre?.quantitativeUnderstanding, avgFinding, pre?.recommendationRating, pre?.preferredStructure,
-        post?.easeOfUnderstanding, post?.detailMatch, post?.structureMatch, post?.versionPreference,
-        mcqResult,
+        m.ageGroup, m.education, m.englishFirstLanguage, m.medicalBackground,
+        m.readingFrequency, m.chronicCondition, termScore(m.termFamiliarity), m.readingPurpose,
+        (r.version_order ?? []).join('>'),
+        vr['original']?.understood, vr['original']?.languageClear, vr['original']?.detailRight, vr['original']?.feltPersonalized, vr['original']?.wouldPrefer,
+        vr['generic']?.understood, vr['generic']?.languageClear, vr['generic']?.detailRight, vr['generic']?.feltPersonalized, vr['generic']?.wouldPrefer,
+        vr['personalized']?.understood, vr['personalized']?.languageClear, vr['personalized']?.detailRight, vr['personalized']?.feltPersonalized, vr['personalized']?.wouldPrefer,
+        score, fc.ranking?.[0], fc.ranking?.[1], fc.ranking?.[2], fc.comments,
       ].map(v => `"${v ?? ''}"`).join(',')
     })
     const blob = new Blob([[headers.join(','), ...csvRows].join('\n')], { type: 'text/csv' })
@@ -125,26 +148,25 @@ function AdminDashboard() {
 
   const completed = rows.filter(r => r.completed)
 
-  const easeScores = completed.map(r => r.post_survey?.easeOfUnderstanding).filter(Boolean) as number[]
-  const detailScores = completed.map(r => r.post_survey?.detailMatch).filter(Boolean) as number[]
-  const structureScores = completed.map(r => r.post_survey?.structureMatch).filter(Boolean) as number[]
-  const mcqScores = completed
-    .map(r => mcqScore(r.post_survey?.mcqAnswers, r.dynamic_mcqs))
-    .filter(v => v !== null) as number[]
+  // Per-version average ratings
+  const versionAvgs = (['original', 'generic', 'personalized'] as const).map(v => ({
+    version: v,
+    label: VERSION_LABELS[v],
+    avgs: RATING_KEYS.map(k => {
+      const vals = completed
+        .map(r => r.version_ratings?.[v]?.[k] as number)
+        .filter(n => typeof n === 'number' && n > 0)
+      return { key: k, label: RATING_SHORT[k], avg: avg(vals) }
+    }),
+  }))
 
-  const preferRewrite = completed.filter(r =>
-    ['strongly-prefer-rewrite', 'prefer-rewrite'].includes(r.post_survey?.versionPreference ?? '')
-  ).length
-  const understoodWhole = completed.filter(r => r.pre_survey?.understoodWhole === 'yes').length
-
-  // Terminology: count how many participants marked each term
-  const termCounts: Record<string, number> = {}
+  // Ranking distribution
+  const rankCounts: Record<string, Record<number, number>> = { original: {}, generic: {}, personalized: {} }
   completed.forEach(r => {
-    (r.pre_survey?.unfamiliarTerms ?? []).forEach(t => {
-      termCounts[t] = (termCounts[t] ?? 0) + 1
+    (r.final_comparison?.ranking ?? []).forEach((v, i) => {
+      if (rankCounts[v]) rankCounts[v][i + 1] = (rankCounts[v][i + 1] ?? 0) + 1
     })
   })
-  const topTerms = Object.entries(termCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
@@ -159,13 +181,13 @@ function AdminDashboard() {
         </div>
       </div>
 
-      {/* Summary stats */}
+      {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Responses', value: rows.length },
           { label: 'Completed', value: `${completed.length} (${pct(completed.length, rows.length)})` },
-          { label: 'Prefer Rewrite', value: completed.length ? `${preferRewrite} (${pct(preferRewrite, completed.length)})` : '—' },
-          { label: 'Understood Original', value: completed.length ? `${understoodWhole} (${pct(understoodWhole, completed.length)})` : '—' },
+          { label: 'Personalized Ranked 1st', value: completed.length ? pct(rankCounts['personalized'][1] ?? 0, completed.length) : '—' },
+          { label: 'Generic Ranked 1st', value: completed.length ? pct(rankCounts['generic'][1] ?? 0, completed.length) : '—' },
         ].map(s => (
           <div key={s.label} className="card p-4 text-center">
             <div className="text-2xl font-bold text-blue-600">{s.value}</div>
@@ -174,49 +196,61 @@ function AdminDashboard() {
         ))}
       </div>
 
-      {/* Post-survey score averages */}
+      {/* Per-version rating averages */}
       {completed.length > 0 && (
-        <div className="card p-6 space-y-4">
-          <h2 className="font-semibold text-slate-800">Post-Rewrite Average Scores (1–5)</h2>
-          {[
-            { label: 'Ease of Understanding', scores: easeScores },
-            { label: 'Detail Match', scores: detailScores },
-            { label: 'Structure Match', scores: structureScores },
-            { label: 'Comprehension Quiz Score (out of 5)', scores: mcqScores, max: 5 },
-          ].map(row => (
-            <div key={row.label} className="space-y-1">
-              <div className="flex justify-between text-sm text-slate-600">
-                <span>{row.label}</span>
-                <span className="font-medium text-blue-700">{avg(row.scores)} {row.max ? '' : '/ 5'}</span>
+        <div className="card p-6 space-y-6">
+          <h2 className="font-semibold text-slate-800">Average Ratings by Version (1–5)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {versionAvgs.map(({ label, avgs }) => (
+              <div key={label} className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-700 border-b pb-1">{label}</h3>
+                {avgs.map(({ key, label: rl, avg: a }) => (
+                  <div key={key} className="space-y-0.5">
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>{rl}</span>
+                      <span className="font-medium text-blue-700">{a}</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full"
+                        style={{ width: `${(Number(a) / 5) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${(Number(avg(row.scores)) / (row.max ?? 5)) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Most confusing terminology */}
-      {topTerms.length > 0 && (
-        <div className="card p-6 space-y-3">
-          <h2 className="font-semibold text-slate-800">Most Frequently Flagged Unfamiliar Terms</h2>
-          <div className="space-y-2">
-            {topTerms.map(([term, count]) => (
-              <div key={term} className="flex items-center gap-3 text-sm">
-                <span className="text-slate-600 w-48 capitalize">{term.replace(/_/g, ' ')}</span>
-                <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-400 rounded-full"
-                    style={{ width: `${(count / completed.length) * 100}%` }}
-                  />
-                </div>
-                <span className="text-slate-500 w-20 text-right">{count} ({pct(count, completed.length)})</span>
-              </div>
-            ))}
+      {/* Ranking distribution */}
+      {completed.length > 0 && (
+        <div className="card p-6 space-y-4">
+          <h2 className="font-semibold text-slate-800">Version Ranking Distribution</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-center">
+              <thead>
+                <tr className="text-xs text-slate-500 border-b">
+                  <th className="py-2 text-left font-medium">Version</th>
+                  <th className="py-2 font-medium">1st Choice</th>
+                  <th className="py-2 font-medium">2nd Choice</th>
+                  <th className="py-2 font-medium">3rd Choice</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(['original', 'generic', 'personalized'] as const).map(v => (
+                  <tr key={v} className="border-b">
+                    <td className="py-2 text-left text-slate-700">{VERSION_LABELS[v]}</td>
+                    {[1, 2, 3].map(rank => (
+                      <td key={rank} className="py-2 text-slate-600">
+                        {rankCounts[v][rank] ?? 0} ({pct(rankCounts[v][rank] ?? 0, completed.length)})
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -235,20 +269,19 @@ function AdminDashboard() {
                 <th className="px-3 py-2 font-medium">Done</th>
                 <th className="px-3 py-2 font-medium">Age</th>
                 <th className="px-3 py-2 font-medium">Med. Bg.</th>
-                <th className="px-3 py-2 font-medium">Term. Fam.</th>
-                <th className="px-3 py-2 font-medium">Understood</th>
-                <th className="px-3 py-2 font-medium">Unfamiliar #</th>
-                <th className="px-3 py-2 font-medium">Ease</th>
-                <th className="px-3 py-2 font-medium">Detail</th>
-                <th className="px-3 py-2 font-medium">Structure</th>
+                <th className="px-3 py-2 font-medium">Term Score</th>
+                <th className="px-3 py-2 font-medium">Orig. Understood</th>
+                <th className="px-3 py-2 font-medium">Gen. Understood</th>
+                <th className="px-3 py-2 font-medium">Pers. Understood</th>
                 <th className="px-3 py-2 font-medium">MCQ /5</th>
-                <th className="px-3 py-2 font-medium">Preference</th>
+                <th className="px-3 py-2 font-medium">1st Choice</th>
               </tr>
             </thead>
             <tbody>
               {rows.map(r => {
-                const score = r.post_survey?.mcqAnswers && r.dynamic_mcqs
-                  ? mcqScore(r.post_survey.mcqAnswers, r.dynamic_mcqs)
+                const vr = r.version_ratings ?? {}
+                const score = vr['personalized']?.mcqAnswers && r.dynamic_mcqs
+                  ? mcqScore(vr['personalized'].mcqAnswers, r.dynamic_mcqs)
                   : null
                 return (
                   <tr key={r.id} className="border-b hover:bg-slate-50 transition-colors">
@@ -263,19 +296,19 @@ function AdminDashboard() {
                     </td>
                     <td className="px-3 py-2 text-slate-600">{r.metadata?.ageGroup ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-600">{r.metadata?.medicalBackground ?? '—'}</td>
-                    <td className="px-3 py-2 text-center">{r.metadata?.terminologyFamiliarity ?? '—'}</td>
-                    <td className="px-3 py-2 text-center">{r.pre_survey?.understoodWhole ?? '—'}</td>
-                    <td className="px-3 py-2 text-center">{r.pre_survey?.unfamiliarTerms?.length ?? '—'}</td>
-                    <td className="px-3 py-2 text-center font-medium text-blue-600">{r.post_survey?.easeOfUnderstanding ?? '—'}</td>
-                    <td className="px-3 py-2 text-center">{r.post_survey?.detailMatch ?? '—'}</td>
-                    <td className="px-3 py-2 text-center">{r.post_survey?.structureMatch ?? '—'}</td>
+                    <td className="px-3 py-2 text-center">{termScore(r.metadata?.termFamiliarity)}/8</td>
+                    <td className="px-3 py-2 text-center">{vr['original']?.understood ?? '—'}</td>
+                    <td className="px-3 py-2 text-center">{vr['generic']?.understood ?? '—'}</td>
+                    <td className="px-3 py-2 text-center font-medium text-blue-600">{vr['personalized']?.understood ?? '—'}</td>
                     <td className="px-3 py-2 text-center">{score !== null ? score : '—'}</td>
-                    <td className="px-3 py-2 text-xs text-slate-600">{r.post_survey?.versionPreference?.replace(/-/g, ' ') ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600">
+                      {VERSION_LABELS[r.final_comparison?.ranking?.[0] ?? ''] ?? '—'}
+                    </td>
                   </tr>
                 )
               })}
               {rows.length === 0 && (
-                <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-400">No responses yet.</td></tr>
+                <tr><td colSpan={11} className="px-4 py-8 text-center text-slate-400">No responses yet.</td></tr>
               )}
             </tbody>
           </table>
