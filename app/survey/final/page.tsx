@@ -17,6 +17,7 @@ export default function FinalPage() {
   const { state, update, loaded } = useSurveyStore()
   const [ranking, setRanking] = useState<string[]>([])
   const [comments, setComments] = useState('')
+  const [mcqAnswers, setMcqAnswers] = useState<Record<number, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -27,6 +28,8 @@ export default function FinalPage() {
   }, [loaded, state.metadata, state.currentVersionIndex, router])
 
   if (!loaded || !state.metadata) return null
+
+  const mcqs = state.dynamicMCQs ?? []
 
   function toggleRank(value: string) {
     setRanking(prev => {
@@ -45,8 +48,16 @@ export default function FinalPage() {
     return ''
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault()
+
+    if (mcqs.length > 0) {
+      const unanswered = mcqs.findIndex((_, i) => !mcqAnswers[i])
+      if (unanswered !== -1) {
+        setError(`Please answer comprehension question ${unanswered + 1}.`)
+        return
+      }
+    }
 
     if (ranking.length < 3) {
       setError('Please rank all three versions before submitting.')
@@ -56,6 +67,14 @@ export default function FinalPage() {
     const finalComparison: FinalComparison = { ranking, comments }
     update({ finalComparison, completedAt: new Date().toISOString(), currentStep: 4 })
     setSubmitting(true)
+
+    // Merge MCQ answers into the personalized version's ratings for storage
+    const enrichedRatings = {
+      ...state.versionRatings,
+      ...(state.versionRatings?.personalized
+        ? { personalized: { ...state.versionRatings.personalized, mcqAnswers } }
+        : {}),
+    }
 
     try {
       await fetch('/api/submit', {
@@ -70,7 +89,7 @@ export default function FinalPage() {
           llmPrompt: state.llmPrompt,
           dynamicMCQs: state.dynamicMCQs,
           versionOrder: state.versionOrder,
-          versionRatings: state.versionRatings,
+          versionRatings: enrichedRatings,
           finalComparison,
         }),
       })
@@ -90,11 +109,60 @@ export default function FinalPage() {
           <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Final Step</div>
           <h1 className="text-2xl font-bold text-slate-900">Compare All Three Versions</h1>
           <p className="text-slate-500 mt-1">
-            Rank the three versions you read from most to least preferred by clicking them in order.
+            Answer the comprehension questions below, then rank the three versions you read.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* Comprehension Quiz — asked once after all 3 versions */}
+          {mcqs.length > 0 && (
+            <div className="card p-6 space-y-6">
+              <div>
+                <h2 className="text-base font-semibold text-slate-700 border-b pb-2">
+                  Comprehension Quiz
+                </h2>
+                <p className="text-sm text-slate-500 mt-2">
+                  Based on the reports you just read, answer these questions to test your understanding.
+                </p>
+              </div>
+              {mcqs.map((q, idx) => (
+                <div key={idx} className="space-y-3">
+                  <p className="font-medium text-slate-800">
+                    <span className="text-slate-400 mr-1">{idx + 1}.</span> {q.question}
+                  </p>
+                  <div className="space-y-2">
+                    {q.options.map(opt => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
+                          ${mcqAnswers[idx] === opt.value
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="radio"
+                          name={`mcq-${idx}`}
+                          value={opt.value}
+                          checked={mcqAnswers[idx] === opt.value}
+                          onChange={() => {
+                            setMcqAnswers(prev => ({ ...prev, [idx]: opt.value }))
+                            setError('')
+                          }}
+                          className="accent-blue-600"
+                        />
+                        <span className="text-sm text-slate-700">
+                          <span className="font-medium uppercase mr-1">{opt.value}.</span>
+                          {opt.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Ranking */}
           <div className="card p-5 space-y-3">
             <p className="font-medium text-slate-800">
