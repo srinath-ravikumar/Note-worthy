@@ -42,6 +42,7 @@ export default function ReadingPage() {
   const versionKey = state.versionOrder[state.currentVersionIndex]
   const versionLabel = VERSION_LABELS[versionKey]
   const subLabel = `Report ${state.currentVersionIndex + 1} of 3`
+  const mcqs = state.dynamicMCQs ?? []
 
   function getContent(): string {
     if (versionKey === 'original') return MEDICAL_REPORT_TEXT
@@ -49,12 +50,22 @@ export default function ReadingPage() {
     return state.personalizedRewrite ?? ''
   }
 
-  function getVariant(): 'original' | 'personalized' {
-    return versionKey === 'original' ? 'original' : 'personalized'
+  function getVariant(): 'original' | 'generic' | 'personalized' {
+    if (versionKey === 'original') return 'original'
+    if (versionKey === 'generic') return 'generic'
+    return 'personalized'
   }
 
   function setRatingField(field: keyof VersionRating, value: number) {
     setRating(prev => ({ ...prev, [field]: value }))
+    setError('')
+  }
+
+  function setMCQAnswer(idx: number, value: string) {
+    setRating(prev => ({
+      ...prev,
+      mcqAnswers: { ...prev.mcqAnswers, [idx]: value },
+    }))
     setError('')
   }
 
@@ -64,6 +75,14 @@ export default function ReadingPage() {
     for (const q of PART_B_QUESTIONS) {
       if (!rating[q.id as keyof VersionRating]) {
         setError(`Please answer: "${q.label}"`)
+        return
+      }
+    }
+
+    if (mcqs.length > 0) {
+      const unanswered = mcqs.findIndex((_, i) => !rating.mcqAnswers[i])
+      if (unanswered !== -1) {
+        setError(`Please answer comprehension question ${unanswered + 1}.`)
         return
       }
     }
@@ -91,7 +110,7 @@ export default function ReadingPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{versionLabel}</h1>
           <p className="text-slate-500 mt-1">
-            Read the report on the left, then answer the rating questions on the right.
+            Read the report on the left, then answer the questions on the right.
           </p>
         </div>
 
@@ -107,8 +126,10 @@ export default function ReadingPage() {
               />
             </div>
 
-            {/* Right: Rating questions */}
+            {/* Right: Rating + comprehension questions */}
             <div className="w-full lg:w-[420px] space-y-5 flex-none">
+
+              {/* Likert scales */}
               <div className="card p-5 space-y-6">
                 <div>
                   <h2 className="font-semibold text-slate-800">Rate This Version</h2>
@@ -128,6 +149,49 @@ export default function ReadingPage() {
                   />
                 ))}
               </div>
+
+              {/* Comprehension MCQs — shown for every version */}
+              {mcqs.length > 0 && (
+                <div className="card p-5 space-y-5">
+                  <div>
+                    <h2 className="font-semibold text-slate-800">Comprehension Quiz</h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Answer based on what you just read.
+                    </p>
+                  </div>
+                  {mcqs.map((q, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <p className="text-sm font-medium text-slate-800">
+                        <span className="text-slate-400 mr-1">{idx + 1}.</span> {q.question}
+                      </p>
+                      <div className="space-y-1.5">
+                        {q.options.map(opt => (
+                          <label
+                            key={opt.value}
+                            className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors text-sm
+                              ${rating.mcqAnswers[idx] === opt.value
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}
+                          >
+                            <input
+                              type="radio"
+                              name={`mcq-${versionKey}-${idx}`}
+                              value={opt.value}
+                              checked={rating.mcqAnswers[idx] === opt.value}
+                              onChange={() => setMCQAnswer(idx, opt.value)}
+                              className="accent-blue-600"
+                            />
+                            <span className="text-slate-700">
+                              <span className="font-medium uppercase mr-1">{opt.value}.</span>
+                              {opt.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {error && (
                 <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-4 py-3">

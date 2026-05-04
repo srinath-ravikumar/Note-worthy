@@ -12,14 +12,6 @@ const STEPS_UI = [
   'Finalizing your reports...',
 ]
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
 
 export default function ProcessingPage() {
   const router = useRouter()
@@ -62,7 +54,7 @@ export default function ProcessingPage() {
           prompt: string
         }
 
-        const versionOrder = shuffle(['original', 'generic', 'personalized'])
+        const versionOrder = ['original', 'generic', 'personalized']
 
         update({
           personalizedRewrite: data.personalizedRewrite,
