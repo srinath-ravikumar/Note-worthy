@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ProgressBar from '@/components/ProgressBar'
 import MedicalReport from '@/components/MedicalReport'
@@ -30,6 +30,7 @@ export default function ReadingPage() {
   const { state, update, loaded } = useSurveyStore()
   const [rating, setRating] = useState<VersionRating>(EMPTY_RATING)
   const [error, setError] = useState('')
+  const reportPanelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (loaded && (!state.metadata || !state.versionOrder)) {
@@ -94,6 +95,7 @@ export default function ReadingPage() {
       update({ versionRatings: newRatings, currentVersionIndex: nextIndex })
       setRating(EMPTY_RATING)
       window.scrollTo(0, 0)
+      reportPanelRef.current?.scrollTo(0, 0)
     } else {
       update({ versionRatings: newRatings, currentStep: 3, currentVersionIndex: 3 })
       router.push('/survey/final')
@@ -118,7 +120,7 @@ export default function ReadingPage() {
           <div className="flex flex-col lg:flex-row gap-6 items-start">
 
             {/* Left: Report — sticky so it stays visible while scrolling questions */}
-            <div className="w-full lg:flex-1 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+            <div ref={reportPanelRef} className="w-full lg:flex-1 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
               <MedicalReport
                 title={MEDICAL_REPORT_TITLE}
                 content={getContent()}
